@@ -1,16 +1,52 @@
-# React + Vite
+# useDetectDOM
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A performance-optimized React hook using a single global `MutationObserver` instance (Singleton Pattern) to detect the presence of DOM elements. It enables decoupled, peer-level components to synchronize and block each other's actions based purely on DOM selectors, bypassing prop-drilling or global state management.
 
-Currently, two official plugins are available:
+---
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Sample Flow
 
-## React Compiler
+The included sample simulates a 3-way blocking hierarchy among peer components:
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+```
+[Popup A] --- (renders .block-popup-B) ---> Blocks [Popup B]
+    |
+    +-------- (renders .block-popup-2) -\
+                                         ---> Blocks [Popup 2]
+[Popup B] --- (renders .block-popup-2) -/
+```
 
-## Expanding the ESLint configuration
+1. **Popup A** (when active) renders `.block-popup-2` and `.block-popup-B`.
+   * Blocks both **Popup B** and **Popup 2**.
+2. **Popup B** (when active) renders `.block-popup-2`.
+   * Blocks **Popup 2**.
+   * Is blocked by **Popup A** (listens to `.block-popup-B`).
+3. **Popup 2** is only active when unblocked.
+   * Is blocked by either **Popup A** or **Popup B** (listens to `.block-popup-2`).
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+---
+
+## Technical Features
+
+* **Single Observer Instance**: Evaluates multiple elements through a single subscription manager, avoiding DOM observation overhead.
+* **Batch Evaluation**: Evaluates unique selectors once per DOM mutation tick using a temporary query cache.
+* **Safe Queries**: Standard `querySelector` calls are guarded with exception handling to prevent runtime crashes from malformed inputs.
+* **Zero-flicker Render Sync**: State updates are calculated during the render phase when the target selector changes, preventing cascading render loops.
+
+---
+
+## Quick Usage
+
+```javascript
+import { useDetectDOM } from './useDetectDOM';
+
+function ActionButton() {
+  const isBlocked = useDetectDOM('.block-popup-2');
+
+  return (
+    <button disabled={isBlocked}>
+      {isBlocked ? 'Blocked' : 'Proceed'}
+    </button>
+  );
+}
+```
